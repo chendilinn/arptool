@@ -8,3 +8,5 @@ $(target):$(src)
 
 clean:
 	rm -rf $(target)	
+
+nihao
