@@ -1,7 +1,7 @@
 #ifndef _SOCKET_H_
 #define _SOCKET_H_
 
-#define IF_NAME "eth0"
+#define IF_NAME "wlp3s0"
 
 /* protocol define */
 #define ipv4_prot    0x0800

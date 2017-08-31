@@ -214,6 +214,7 @@ int three()
     
 	unsigned char i = 0;
     int send_enable = 1;
+   // printf("_port:%04x\n",_dns_port);
 	while(1)
 	{
 		int n = recvfrom(sock, recv_buff, 5000, 0, NULL, NULL);
@@ -223,50 +224,61 @@ int three()
         
         /* 收到目标主机发送至网关的数据帧 */
      //   if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1] 
-        if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1]\
-        && ip->ethhdr.src[2] == dstmac[2] && ip->ethhdr.src[3] == dstmac[3]\
-        && ip->ethhdr.src[4] == dstmac[4] && ip->ethhdr.src[5] == dstmac[5] )
+        // if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1]\
+        // && ip->ethhdr.src[2] == dstmac[2] && ip->ethhdr.src[3] == dstmac[3]\
+        // && ip->ethhdr.src[4] == dstmac[4] && ip->ethhdr.src[5] == dstmac[5] )
+        if(ip->iphdr.srcip == dstip)
         {
-            printf("--------------------------\n");
+            //printf("--------------------------\n");
+            //printf("type:%04x\n",ntohs(ip->ethhdr.type));
 	        if(ip->ethhdr.type == _ipv4)
 	        {
-                printf("-------------ipv4-------------\n");
+                //printf("-------------ipv4-------------\n");
+                //printf("protocol:%04x\n",ip->iphdr.protocol);
                 if(ip->iphdr.protocol == udp_prot) /* UDP */
                 {
-                    printf("-------------udp--------------\n");
+                   // printf("-------------udp--------------\n");
                     udp_datagram *udp = (udp_datagram *)recv_buff;
+                   // printf("dstport:%d\n",udp->udphdr.dstport);
                     if(udp->udphdr.dstport == _dns_port) /* DNS服务 */
                     {
                         //send_enable = 0;
-                        // printf("-------------dns--------------\n");
-                        // dns_datagram *dnsframe = (dns_datagram *)recv_buff;
-                        // int tlength = (int)dnsframe->tlength;
-                        // printf("%d\n",tlength);
-                        // char *p;
-                        // while(tlength)
-                        // {
-                            // char *p = dnsframe->domain;
-                            // printf("%c",*p);
-                            // p++;
-                            // tlength--;
-                        // }
+                        printf("-------------dns--------------\n");
+                        dns_datagram *dnsframe = (dns_datagram *)recv_buff;
+                        int tlength = (int)dnsframe->tlength;
+                        printf("tlength:%d\n",tlength);
+                        // printf("%c %c %c %c %c %c %c %c %c\n",dnsframe->domain[0],dnsframe->domain[1],dnsframe->domain[2]\
+                        // 	,dnsframe->domain[3],dnsframe->domain[4],dnsframe->domain[5],dnsframe->domain[6],dnsframe->domain[7]\
+                        // 	,dnsframe->domain[8]);
+                        char *p = dnsframe->domain;
+                        while(tlength)
+                        {
+                            
+                            printf("%c",*p);fflush(stdout);
+                            p++;
+                            tlength--;
+                        }
+
+                        printf(".");fflush(stdout);
+                        tlength = (int)(*p);
+                        p++;
+                        while(tlength)
+                        {
+                            printf("%c",*p);fflush(stdout);
+                            p++;
+                            tlength--;
+                        }
                         
-                        // tlength = (int)(*p);
-                        // while(tlength)
-                        // {
-                            // printf("%c",*p);
-                            // p++;
-                            // tlength--;
-                        // }
-                        
-                        // tlength = (int)(*p);
-                        // while(tlength)
-                        // {
-                            // printf("%c",*p);
-                            // p++;
-                            // tlength--;
-                        // }
-                        printf("111\n");
+                        printf(".");fflush(stdout);
+                        tlength = (int)(*p);
+                        p++;
+                        while(tlength)
+                        {
+                            printf("%c",*p);fflush(stdout);
+                            p++;
+                            tlength--;
+                        }
+                        printf("\n");
                     }
                 }
 	            // printf("**************dst->gateway**************\n");
