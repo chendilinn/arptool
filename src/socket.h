@@ -47,27 +47,27 @@ typedef struct _udp_header
     u16 check_sum;
 }__attribute__((packed)) udp_header;
 
-typedef struct _dns_datagram
-{
-    eth_header eth;
-    ip_header  ip;
-    udp_header udp;
-    u16 transactionid;
-    u16 flags;
-}__attribute__((packed)) dns_datagram;
-
 typedef struct _ip_datagram
 {
-    eth_header eth;
-    ip_header  ip;
+    eth_header ethhdr;
+    ip_header  iphdr;
 }__attribute__((packed)) ip_datagram;
 
 typedef struct _udp_datagram
 {
-    eth_header eth;
-    ip_header  ip;
-    udp_header udp;
+    eth_header ethhdr;
+    ip_header  iphdr;
+    udp_header udphdr;
 }__attribute__((packed)) udp_datagram;
+
+typedef struct _dns_datagram
+{
+    eth_header ethhdr;
+    ip_header  iphdr;
+    udp_header udphdr;
+    u16 transactionid;
+    u16 flags;
+}__attribute__((packed)) dns_datagram;
 
 typedef struct _arp  //size:42byte 以太网ARP协议数据帧
 {
