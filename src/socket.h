@@ -1,13 +1,20 @@
 #ifndef _SOCKET_H_
 #define _SOCKET_H_
 
-#define IF_NAME "wlp3s0"
+#define IF_NAME "eth0"
 
-/* port define */
+/* protocol define */
+#define ipv4_prot    0x0800
+#define arp_prot     0x0806
+#define tcp_prot     0x06
+#define udp_prot     0x11
+
+
+/* application port define */
 #define ftp     21
 #define ssh     22
 #define telnet  23
-#define domain  53
+#define dns     53
 #define tftp    69
 #define http    80
 #define https   443
@@ -74,16 +81,15 @@ typedef struct _arp  //size:42byte 以太网ARP协议数据帧
     u8  dst[6];//目标MAC地址
     u8  src[6];//源MAC地址
     u16 type;//帧类型 ARP 
-    
     u16 htype;//硬件类型
     u16 ptype;//协议类型
     u8  hlen;
     u8  plen;//协议地址长度
     u16 oper;//操作码
     u8  sender_mac[6];//sender hardware address
-             int   sender_ip;//sender ip address
+    int   sender_ip;//sender ip address
     u8  target_mac[6];
-             int   target_ip;
+    int   target_ip;
 }__attribute__((packed)) ARPFRAME;//强制不对齐 紧凑方式
 
 int getlocalmac(u8 *mac);

