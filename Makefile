@@ -4,7 +4,7 @@ target = arptool
 src = $(srcdir)*.*
 
 $(target):$(src)
-	$(cc) -o $(target) $(srcdir)/*.c -lpthread
+	$(cc) -o $@ $(srcdir)/*.c -lpthread
 
 clean:
 	rm -rf $(target)	
