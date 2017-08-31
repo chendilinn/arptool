@@ -223,62 +223,59 @@ int three()
         send_enable = 1;
         
         /* 收到目标主机发送至网关的数据帧 */
-     //   if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1] 
-        // if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1]\
-        // && ip->ethhdr.src[2] == dstmac[2] && ip->ethhdr.src[3] == dstmac[3]\
-        // && ip->ethhdr.src[4] == dstmac[4] && ip->ethhdr.src[5] == dstmac[5] )
         if(ip->iphdr.srcip == dstip)
         {
-            //printf("--------------------------\n");
-            //printf("type:%04x\n",ntohs(ip->ethhdr.type));
 	        if(ip->ethhdr.type == _ipv4)
 	        {
-                //printf("-------------ipv4-------------\n");
-                //printf("protocol:%04x\n",ip->iphdr.protocol);
                 if(ip->iphdr.protocol == udp_prot) /* UDP */
                 {
-                   // printf("-------------udp--------------\n");
                     udp_datagram *udp = (udp_datagram *)recv_buff;
-                   // printf("dstport:%d\n",udp->udphdr.dstport);
                     if(udp->udphdr.dstport == _dns_port) /* DNS服务 */
                     {
                         //send_enable = 0;
-                        printf("-------------dns--------------\n");
+                        char domain[100] = {0};
+                        char *pdomain = domain;
                         dns_datagram *dnsframe = (dns_datagram *)recv_buff;
                         int tlength = (int)dnsframe->tlength;
-                        printf("tlength:%d\n",tlength);
-                        // printf("%c %c %c %c %c %c %c %c %c\n",dnsframe->domain[0],dnsframe->domain[1],dnsframe->domain[2]\
-                        // 	,dnsframe->domain[3],dnsframe->domain[4],dnsframe->domain[5],dnsframe->domain[6],dnsframe->domain[7]\
-                        // 	,dnsframe->domain[8]);
+                        int dlength = tlength;
                         char *p = dnsframe->domain;
                         while(tlength)
                         {
-                            
-                            printf("%c",*p);fflush(stdout);
+                            *pdomain = *p;
                             p++;
+                            pdomain++;
                             tlength--;
                         }
 
-                        printf(".");fflush(stdout);
+                        *pdomain = '.';
                         tlength = (int)(*p);
                         p++;
+                        pdomain++;
                         while(tlength)
                         {
-                            printf("%c",*p);fflush(stdout);
+                            *pdomain = *p;
                             p++;
+                            pdomain++;
                             tlength--;
                         }
                         
-                        printf(".");fflush(stdout);
+                        *pdomain = 0;
                         tlength = (int)(*p);
                         p++;
+                        pdomain++;
                         while(tlength)
                         {
-                            printf("%c",*p);fflush(stdout);
+                            *pdomain = *p;
                             p++;
+                            pdomain++;
                             tlength--;
                         }
-                        printf("\n");
+                        printf("%s\n",domain+dlength+1);
+                        if(0 == strcmp(domain+dlength+1, "csdn"))
+                        {
+                        	send_enable = 0;
+                        }
+
                     }
                 }
 	            // printf("**************dst->gateway**************\n");
