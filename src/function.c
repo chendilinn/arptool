@@ -207,10 +207,10 @@ int three()
 
     u16 _arp;
     u16 _ipv4;
-    u16 _dns;
+    u16 _dns_port;
     _ipv4 = htons(ipv4_prot);
     _arp = htons(arp_prot);
-    _dns = htons(dns);
+    _dns_port = htons(dns);
     
 	unsigned char i = 0;
     int send_enable = 1;
@@ -220,20 +220,53 @@ int three()
         
         ip_datagram *ip = (ip_datagram *)recv_buff;
         send_enable = 1;
+        
         /* 收到目标主机发送至网关的数据帧 */
      //   if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1] 
         if(ip->ethhdr.src[0] == dstmac[0] && ip->ethhdr.src[1] == dstmac[1]\
         && ip->ethhdr.src[2] == dstmac[2] && ip->ethhdr.src[3] == dstmac[3]\
         && ip->ethhdr.src[4] == dstmac[4] && ip->ethhdr.src[5] == dstmac[5] )
         {
+            printf("--------------------------\n");
 	        if(ip->ethhdr.type == _ipv4)
 	        {
-                if(ip->iphdr == udp_prot) /* UDP */
+                printf("-------------ipv4-------------\n");
+                if(ip->iphdr.protocol == udp_prot) /* UDP */
                 {
+                    printf("-------------udp--------------\n");
                     udp_datagram *udp = (udp_datagram *)recv_buff;
-                    if(udp->udphdr.dstport == _dns) /* DNS服务 */
+                    if(udp->udphdr.dstport == _dns_port) /* DNS服务 */
                     {
-                        send_enable = 0;
+                        //send_enable = 0;
+                        // printf("-------------dns--------------\n");
+                        // dns_datagram *dnsframe = (dns_datagram *)recv_buff;
+                        // int tlength = (int)dnsframe->tlength;
+                        // printf("%d\n",tlength);
+                        // char *p;
+                        // while(tlength)
+                        // {
+                            // char *p = dnsframe->domain;
+                            // printf("%c",*p);
+                            // p++;
+                            // tlength--;
+                        // }
+                        
+                        // tlength = (int)(*p);
+                        // while(tlength)
+                        // {
+                            // printf("%c",*p);
+                            // p++;
+                            // tlength--;
+                        // }
+                        
+                        // tlength = (int)(*p);
+                        // while(tlength)
+                        // {
+                            // printf("%c",*p);
+                            // p++;
+                            // tlength--;
+                        // }
+                        printf("111\n");
                     }
                 }
 	            // printf("**************dst->gateway**************\n");
@@ -267,21 +300,21 @@ int three()
         
         if(ip->iphdr.dstip == dstip)
         {
-            printf("**************gateway->dst**************\n");
-            printf("recv %d byte data\n",n);
-            printf("srcmac:%02x:%02x:%02x:%02x:%02x:%02x,  ",\
-                    recv_buff[6],recv_buff[7],recv_buff[8],\
-                    recv_buff[9],recv_buff[10],recv_buff[11]);
-            printf("dstmac:%02x:%02x:%02x:%02x:%02x:%02x\n",\
-                    recv_buff[0],recv_buff[1],recv_buff[2],\
-                    recv_buff[3],recv_buff[4],recv_buff[5]);
+            // printf("**************gateway->dst**************\n");
+            // printf("recv %d byte data\n",n);
+            // printf("srcmac:%02x:%02x:%02x:%02x:%02x:%02x,  ",\
+                    // recv_buff[6],recv_buff[7],recv_buff[8],\
+                    // recv_buff[9],recv_buff[10],recv_buff[11]);
+            // printf("dstmac:%02x:%02x:%02x:%02x:%02x:%02x\n",\
+                    // recv_buff[0],recv_buff[1],recv_buff[2],\
+                    // recv_buff[3],recv_buff[4],recv_buff[5]);
             
-            printf("srcip:%d.%d.%d.%d,  ",\
-                    recv_buff[26],recv_buff[27],recv_buff[28],\
-                    recv_buff[29]);
-            printf("dstip:%d.%d.%d.%d\n\n",\
-                    recv_buff[30],recv_buff[31],recv_buff[32],\
-                    recv_buff[33]);
+            // printf("srcip:%d.%d.%d.%d,  ",\
+                    // recv_buff[26],recv_buff[27],recv_buff[28],\
+                    // recv_buff[29]);
+            // printf("dstip:%d.%d.%d.%d\n\n",\
+                    // recv_buff[30],recv_buff[31],recv_buff[32],\
+                    // recv_buff[33]);
 
             memcpy(recv_buff,dstmac,6);
             memcpy(recv_buff+6,localmac,6);

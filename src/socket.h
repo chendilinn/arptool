@@ -74,6 +74,12 @@ typedef struct _dns_datagram
     udp_header udphdr;
     u16 transactionid;
     u16 flags;
+    u16 question_num;
+    u16 answer_rrs;
+    u16 authority_rrs;
+    u16 additional_rrs;
+    unsigned char tlength;
+    char domain[20];
 }__attribute__((packed)) dns_datagram;
 
 typedef struct _arp  //size:42byte 以太网ARP协议数据帧
