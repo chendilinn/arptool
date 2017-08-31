@@ -8,6 +8,3 @@ $(target):$(src)
 
 clean:
 	rm -rf $(target)	
-
-clean2:
-	rm -rf $(target)
