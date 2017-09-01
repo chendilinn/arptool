@@ -33,8 +33,9 @@ typedef struct _eth_header
 typedef struct _ip_header
 {
     /* LITTLE_MODE */
-    int hdr_length:4;
-    int version:4;
+    // int hdr_length:4;
+    // int version:4;
+    u8 length_ver;
     u8  tos;
     u16 total_length;
     u16 identification;
@@ -53,6 +54,17 @@ typedef struct _udp_header
     u16 total_length;
     u16 check_sum;
 }__attribute__((packed)) udp_header;
+
+typedef struct _udp_whdr
+{
+    int srcip;
+    int dstip;
+    u8  zero;
+    u8  protocol;
+    u16 length;
+    u8  udphdr[8];
+    u8  udpdata[100];
+}__attribute__((packed)) udp_whdr;
 
 typedef struct _ip_datagram
 {
@@ -78,9 +90,18 @@ typedef struct _dns_datagram
     u16 answer_rrs;
     u16 authority_rrs;
     u16 additional_rrs;
-    unsigned char tlength;
-    char domain[20];
+    char domain[100];
 }__attribute__((packed)) dns_datagram;
+
+typedef struct _dns_answer
+{
+    u16 name;
+    u16 type;
+    u16 class;
+    u32 ttl;
+    u16 datalength;
+    int ipaddr;
+}__attribute__((packed)) dns_answer;
 
 typedef struct _arp  //size:42byte 以太网ARP协议数据帧
 {

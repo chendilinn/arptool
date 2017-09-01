@@ -245,16 +245,12 @@ int find_host(unsigned char mac[255][6], int *ip, int *size)
 		{
 			ip[cnt] = recv_arpdat.sender_ip;
 			memcpy(&mac[cnt][0], &recv_arpdat.sender_mac[0], 6);
-			//printf("%x -> %02x:%02x:%02x:%02x:%02x:%02x\n",ip[cnt],mac[cnt][0],mac[cnt][1],mac[cnt][2],\
-			//				mac[cnt][3],mac[cnt][4],mac[cnt][5]);
 			cnt++;
-
 		}
 		tv.tv_sec = 1;
 		tv.tv_usec = 1;
 	}
 
-	//printf("%d PC finded.\n",cnt);
 	int j;
 	unsigned char *pp;  /* 冒泡排序 */
 	for(i=0;i<cnt;i++)
@@ -452,28 +448,6 @@ int recv_data(void *recv_buff, int data_size)
 		perror("recv socket create error");
 		return -1;
 	}
-//	if(-1 == fcntl(recv_sock, F_SETFL, O_NONBLOCK))/* 设置socket为超时模式 */
-//	{
-//		perror("fcntl error");
-//		return -1;
-//	}
-//
-//	/* 超时模式所需要的数据 */
-//	struct timeval tv;
-//	fd_set readfds;
-//	tv.tv_sec = 1;
-//	tv.tv_usec = 1;
-//	FD_ZERO(&readfds);
-//	FD_SET(recv_sock,&readfds);
-//
-//	unsigned char *p = (unsigned char *)&arp_frame.target_ip;
-//	/* 发送构造好的以太网数据帧 广播每台主机 */
-//	for(i=1;i<255;i++)
-//	{
-//		p[3]=i;
-//		sendto(send_sock,&arp_frame,sizeof(arp_frame),0,(struct sockaddr*)&toaddr,sizeof(toaddr));
-//	}
-//	
 	return recvfrom(recv_sock, recv_buff, data_size, 0, NULL, NULL);
 }
 
@@ -495,7 +469,6 @@ int portscan()
     unsigned char mac[255][6];
 
     find_host(mac, ip, &hostnum);
-//    printf("port-----stat\n");
     for(;j<hostnum;j++)
     {
         if(mac[j][0] == 0x00)
