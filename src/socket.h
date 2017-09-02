@@ -1,7 +1,7 @@
 #ifndef _SOCKET_H_
 #define _SOCKET_H_
 
-#define IF_NAME "eth0"
+#define IF_NAME "wlp3s0"
 
 /* protocol define */
 #define ipv4_prot    0x0800
@@ -62,7 +62,7 @@ typedef struct _udp_whdr
     u8  zero;
     u8  protocol;
     u16 length;
-    u8  udphdr[8];
+    udp_header  udphdr;
     u8  udpdata[100];
 }__attribute__((packed)) udp_whdr;
 

