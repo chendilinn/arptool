@@ -35,7 +35,7 @@ typedef struct _ip_header
     /* LITTLE_MODE */
     // int hdr_length:4;
     // int version:4;
-    u8 length_ver;
+    u8  length_ver;
     u8  tos;
     u16 total_length;
     u16 identification;
