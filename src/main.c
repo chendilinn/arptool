@@ -27,15 +27,8 @@ int main(int argc,char *argv[])
 	printf("[3]DNS劫持.\n");
 	printf("[4]局域网软件（VNC等)断网工具.\n");
 	printf("[5]端口扫描.\n");
-	printf(".................................  ");
+	printf(".....................................  ");
 	printf("选择功能:");fflush(stdout);
-
-    char s[100]={0};
-    dns_datagram *dn = (dns_datagram *)s;
-    // printf("ipaddr=%p\n",&dn->iphdr.length_ver);
-    // printf("ipaddr=%p\n",&dn->iphdr.dstip);
-
-    // printf("size=%ld\n",sizeof(ip_header));
     int option;
     scanf("%d",&option);
     switch (option)
