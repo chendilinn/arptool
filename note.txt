@@ -1,0 +1,8 @@
+发送消息时出现message too long，原因是系统有个默认的mtu值为1500,
+在/sys/class/net/eth0/mtu里面保存，更改值即可
+
+查看:
+    cat /sys/class/net/eth0/mtu
+
+更改;
+    echo "16384" > /sys/class/net/eth0/mtu

