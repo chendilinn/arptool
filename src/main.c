@@ -15,11 +15,21 @@
 #include <strings.h>
 #include <arpa/inet.h>
 
+#include  "log.h"
 #include "socket.h"
 #include "function.h"
 
+char *IF_NAME;
+
 int main(int argc,char *argv[]) 
 {
+	LOG("main()\n");
+	if(argc != 2)
+	{
+		printf("Usage: %s Interface name\n",argv[0]);
+		return 0;
+	}
+	IF_NAME = argv[1];
 	printf("***************LAN network tools*******************\n");
 	printf("*****************Version: 0.3**********************\n");
 	printf("[1]Find LAN host.\n");

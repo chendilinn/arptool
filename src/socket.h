@@ -1,7 +1,9 @@
 #ifndef _SOCKET_H_
 #define _SOCKET_H_
 
-#define IF_NAME "wlp3s0"
+//#define IF_NAME "wlp3s0" //interface name
+
+extern char *IF_NAME; //interface name,define in main.c,argv[1]
 
 /* protocol define */
 #define ipv4_prot    0x0800

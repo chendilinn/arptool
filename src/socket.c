@@ -28,14 +28,16 @@
 #include <net/ethernet.h>
 #include <fcntl.h>
 #include "socket.h"
+#include  "log.h"
 
 /************************
 函数功能:check sum
-参数：
-返回值：
+参数：buf:需要校验的数组，len:数组长度
+返回值：校验和
 ************************/
 unsigned short check_sum(unsigned short *buf, int len)
 {
+     LOG("check_sum()\n");
     unsigned int sum = 0;
     while(len > 1)
     {
@@ -65,6 +67,7 @@ unsigned short check_sum(unsigned short *buf, int len)
 ************************/
 int getlocalmac(unsigned char *mac)
 {
+	LOG("getlocalmac()\n");
 	int s = socket(AF_INET, SOCK_DGRAM, 0);
 	struct ifreq req;
 	strcpy(req.ifr_name,IF_NAME);        /* IF_NAME = "eth0" interface name */
@@ -92,6 +95,7 @@ int getlocalmac(unsigned char *mac)
 ******************************/
 int getlocalip()
 {
+	LOG("getlocalip()\n");
 	int s = socket(AF_INET, SOCK_DGRAM, 0);
 	struct ifreq req;
 	int ip;
@@ -118,6 +122,7 @@ int getlocalip()
 ******************************/
 int getgateway()
 {
+	LOG("getgateway()\n");
 	FILE* gw_fd;
 	char temp[100],szNetGate[20];
 	if((gw_fd = popen("route -n | grep 'UG'", "r")))
@@ -141,6 +146,7 @@ int getgateway()
 int fill_arp_frame(ARPFRAME *arp_frame, unsigned char type, unsigned char *dst,\
 				   unsigned char *src, int sender_ip, int target_ip)
 {
+	LOG("fill_arp_frame()\n");
 	int i = 0;
 	for(i=0;i<6;i++)
 	{
@@ -170,6 +176,7 @@ int fill_arp_frame(ARPFRAME *arp_frame, unsigned char type, unsigned char *dst,\
 **************************************/
 int find_host(unsigned char mac[255][6], int *ip, int *size)
 {
+	LOG("find_host()\n");
 	ARPFRAME arp_frame = {0};
 	
 	unsigned char localmac[6],dst_mac[6];
@@ -231,6 +238,7 @@ int find_host(unsigned char mac[255][6], int *ip, int *size)
 
 	unsigned char *p = (unsigned char *)&arp_frame.target_ip;
 	/* 发送构造好的以太网数据帧 广播每台主机 */
+	LOG("sendattck\n");
 	for(i=1;i<255;i++)
 	{
 		p[3]=i;
@@ -238,8 +246,9 @@ int find_host(unsigned char mac[255][6], int *ip, int *size)
 	}
 	
 	int cnt=0;
+	int re=0;
 	ARPFRAME recv_arpdat;
-	while(select(recv_sock+1, &readfds, NULL, NULL, &tv) > 0) /* 是否有数据来到 是否超时 */
+	while((re=select(recv_sock+1, &readfds, NULL, NULL, &tv)) > 0) /* 是否有数据来到 是否超时 */
 	{
 		recvfrom(recv_sock, &recv_arpdat, sizeof(recv_arpdat), 0, NULL, NULL);
 		if(arp_frame.type == htons(0x0806) && recv_arpdat.oper==htons(0x02))/*0806表示协议为arp协议，将0x0806转换成网络字节序放入type字段*/ 
@@ -251,6 +260,7 @@ int find_host(unsigned char mac[255][6], int *ip, int *size)
 		tv.tv_sec = 1;
 		tv.tv_usec = 1;
 	}
+	LOG("re=%d\n",re);
 
 	int j;
 	unsigned char *pp;  /* 冒泡排序 */
@@ -290,6 +300,7 @@ int find_host(unsigned char mac[255][6], int *ip, int *size)
 **************************************/
 int getmacbyip(char *ip, unsigned char *mac)
 {
+	LOG("getmacbyip()\n");
 	ARPFRAME arp_frame = {0};
 	
 	unsigned char localmac[6],dst_mac[6];
@@ -401,6 +412,7 @@ int getmacbyip(char *ip, unsigned char *mac)
 ******************************************/
 int send_data(void *send_data, int data_size)
 {
+	LOG("send_data()\n");
 	/* 为发送数据帧做准备 创建发送数据的socket */
 	int send_sock;
 	if((send_sock=socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0)
@@ -443,6 +455,7 @@ int send_data(void *send_data, int data_size)
 ******************************************/
 int recv_data(void *recv_buff, int data_size)
 {
+	LOG("recv_data()\n");
 	int recv_sock;	
 	if((recv_sock=socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) < 0)
 	{
@@ -454,6 +467,7 @@ int recv_data(void *recv_buff, int data_size)
 
 int portscan()
 {
+    LOG("portscan()\n");
     unsigned short portlist[7] = {21,22,23,53,69,80,443};
     int sock = socket(AF_INET, SOCK_STREAM, 0); 
     if(-1 == sock)
