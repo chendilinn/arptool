@@ -1,7 +1,7 @@
-srcdir = ./src/
+srcdir = ./src
 cc = gcc -Wall
 target = arptool
-src = $(srcdir)*.*
+src = $(srcdir)/*.*
 
 $(target):$(src)
 	$(cc) -o $@ $(srcdir)/*.c -lpthread
